@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Намаз-трекер</title>
+<!-- Шрифты: Cormorant Garamond (акцидентный, даты/цифры) + Manrope (основной). Кириллица поддерживается. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   ДИЗАЙН-ТОКЕНЫ
+   Палитра: изумруд + песок (светлая) / чернильно-зелёный (тёмная).
+   Латунь — для «каза», приглушённый кирпич — для «пропущен».
+   ============================================================ */
+:root, [data-theme="light"]{
+  --bg:#F3EDE1;            /* песок */
+  --card:#FCF8EF;
+  --card-2:#F5EFE1;
+  --line:#E3DAC6;
+  --ink:#22312B;           /* тёмно-зелёные чернила */
+  --muted:#71806F;
+  --emerald:#177A5B;
+  --emerald-strong:#0E5F46;
+  --emerald-soft:#DFEDE4;
+  --brass:#A0722C;         /* каза */
+  --brass-soft:#F1E3C6;
+  --brick:#AE4F3B;         /* пропущен */
+  --brick-soft:#F3DCD3;
+  --travel:#456C9C;        /* в пути (сафар) */
+  --travel-soft:#E1E8F1;
+  --plum:#84547F;          /* пропущен в пути */
+  --plum-soft:#EFDEEC;
+  --none-chip:#EAE2D0;
+  --shadow:0 10px 30px rgba(34,49,43,.08);
+  --ring:rgba(23,122,91,.35);
+}
+[data-theme="dark"]{
+  --bg:#0D1411;
+  --card:#151E19;
+  --card-2:#1A2520;
+  --line:#26342C;
+  --ink:#E9E5D7;
+  --muted:#8EA093;
+  --emerald:#33A67F;
+  --emerald-strong:#4CC49A;
+  --emerald-soft:#16352A;
+  --brass:#C99C4E;
+  --brass-soft:#33290F;
+  --brick:#CD7057;
+  --brick-soft:#361F17;
+  --travel:#7AA0CE;
+  --travel-soft:#18232F;
+  --plum:#C289BB;
+  --plum-soft:#2B1E29;
+  --none-chip:#232E28;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+  --ring:rgba(76,196,154,.4);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  font-size:16px;line-height:1.45;
+  min-height:100dvh;
+  transition:background .25s,color .25s;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--emerald);outline-offset:2px;border-radius:8px;
+}
+input,select,textarea{
+  font:inherit;color:var(--ink);background:var(--card-2);
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;
+}
+.serif{font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif}
+.tnum{font-feature-settings:'tnum';font-variant-numeric:tabular-nums}
+
+/* ---------- Каркас: один столбец, мобильный приоритет ---------- */
+/* Мягкая подложка в зелёных тонах — без узоров */
+body::before{
+  content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(130% 80% at 50% -15%, rgba(23,122,91,.14), transparent 62%),
+    radial-gradient(90% 70% at 100% 105%, rgba(23,122,91,.08), transparent 55%);
+}
+[data-theme="dark"] body::before{
+  background:
+    radial-gradient(130% 80% at 50% -15%, rgba(76,196,154,.12), transparent 62%),
+    radial-gradient(90% 70% at 100% 105%, rgba(51,166,127,.09), transparent 55%);
+}
+#app{max-width:480px;margin:0 auto;padding:0 14px calc(86px + env(safe-area-inset-bottom));}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 2px 8px;
+}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.02em}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--emerald)}
+.topbar .actions{display:flex;gap:6px}
+.iconbtn{
+  width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+  background:var(--card);border:1px solid var(--line);
+}
+.iconbtn svg{width:20px;height:20px;stroke:var(--ink);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Нижняя навигация ---------- */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  display:flex;justify-content:center;
+  background:color-mix(in srgb,var(--card) 92%,transparent);
+  backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tabbar .inner{display:flex;width:100%;max-width:480px}
+.tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:10px 0 9px;color:var(--muted);font-size:12px;font-weight:600;
+  border-top:2px solid transparent;
+}
+.tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.active{color:var(--emerald);border-top-color:var(--emerald)}
+
+/* ---------- Карточки ---------- */
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:18px;
+  box-shadow:var(--shadow);padding:16px;margin-top:12px;
+}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:10px}
+.fine{font-size:12.5px;color:var(--muted);line-height:1.5}
+
+/* ---------- Экран «Сегодня»: дата ---------- */
+.datecard{text-align:center;padding:18px 16px 6px}
+.date-g{font-size:30px;line-height:1.1;font-weight:600}
+.date-h{margin-top:4px;color:var(--muted);font-size:14px}
+.sunrise{margin-top:2px;color:var(--muted);font-size:12.5px}
+
+/* ---------- Фирменный элемент: дуга дня (путь солнца, 5 сегментов) ---------- */
+.arcwrap{position:relative;margin:6px auto 0;max-width:320px}
+.arcwrap svg{display:block;width:100%;height:auto}
+.arc-seg{fill:none;stroke:var(--none-chip);stroke-width:13;stroke-linecap:round;transition:stroke .3s}
+.arc-seg.ontime{stroke:var(--emerald)}
+.arc-seg.qada{stroke:var(--brass)}
+.arc-seg.missed{stroke:var(--brick)}
+.arc-seg.travel{stroke:var(--travel)}
+.arc-seg.missed_travel{stroke:var(--plum)}
+.arc-center{
+  position:absolute;left:0;right:0;bottom:0;text-align:center;
+}
+.arc-count{font-size:52px;font-weight:600;line-height:.95}
+.arc-count small{font-size:26px;color:var(--muted)}
+.arc-sub{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:2px}
+.nextline{
+  margin:12px auto 2px;display:inline-flex;align-items:center;gap:8px;
+  background:var(--emerald-soft);color:var(--emerald-strong);
+  border-radius:999px;padding:7px 14px;font-size:13.5px;font-weight:700;
+}
+.nextline .pulse{width:7px;height:7px;border-radius:50%;background:var(--emerald);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ---------- Строки намазов ---------- */
+.prayers{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.prayer{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:13px 14px;min-height:64px;box-shadow:var(--shadow);
+  transition:transform .08s ease,border-color .2s;
+}
+.prayer:active{transform:scale(.985)}
+.prayer.next{border-color:var(--emerald)}
+.prayer .info{flex:1;min-width:0}
+.prayer .name{font-weight:800;font-size:17px}
+.prayer .sub{font-size:12.5px;color:var(--muted)}
+.chip{
+  min-width:118px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  border-radius:999px;padding:10px 12px;font-size:13.5px;font-weight:800;
+  background:var(--none-chip);color:var(--muted);transition:background .2s,color .2s;
+}
+.chip .ic{font-size:14px;line-height:1}
+.chip.ontime{background:var(--emerald);color:#fff}
+[data-theme="dark"] .chip.ontime{color:#08130E}
+.chip.qada{background:var(--brass-soft);color:var(--brass)}
+.chip.missed{background:var(--brick-soft);color:var(--brick)}
+.chip.travel{background:var(--travel-soft);color:var(--travel)}
+.chip.missed_travel{background:var(--plum-soft);color:var(--plum)}
+.chip.locked-chip{background:transparent;border:1px dashed var(--line);color:var(--muted)}
+.prayer.locked{opacity:.55;cursor:default}
+.prayer.locked:active{transform:none}
+
+/* ---------- Меню выбора статуса намаза ---------- */
+.pick-opt{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:13px 15px;margin-top:9px;border-radius:14px;
+  border:1px solid var(--line);background:var(--card-2);
+  font-size:16px;font-weight:700;
+}
+.pick-opt .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px;flex:0 0 30px}
+.pick-opt.ontime .ic{background:var(--emerald);color:#fff}
+[data-theme="dark"] .pick-opt.ontime .ic{color:#08130E}
+.pick-opt.travel .ic{background:var(--travel-soft);color:var(--travel)}
+.pick-opt.qada .ic{background:var(--brass-soft);color:var(--brass)}
+.pick-opt.missed .ic{background:var(--brick-soft);color:var(--brick)}
+.pick-opt.missed_travel .ic{background:var(--plum-soft);color:var(--plum)}
+.pick-opt.clear .ic{background:var(--none-chip);color:var(--muted)}
+.pick-back{display:block;margin:12px auto 0;color:var(--muted);font-weight:700;font-size:14px;padding:6px 10px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:12px}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+/* ---------- Календарь ---------- */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-top:14px}
+.cal-title{font-size:26px;font-weight:600}
+.cal-nav{display:flex;gap:6px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+.dow{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-align:center;text-transform:uppercase;padding:4px 0}
+.day{
+  aspect-ratio:1/1.06;border-radius:12px;border:1px solid var(--line);background:var(--card);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  font-weight:700;font-size:14px;position:relative;
+}
+.day.out{visibility:hidden}
+.day.future{opacity:.38;pointer-events:none}
+.day.today{border:2px solid var(--emerald)}
+.day.full{background:var(--emerald);border-color:var(--emerald);color:#fff;font-weight:800}
+[data-theme="dark"] .day.full{color:#08130E}
+.day.miss{color:var(--brick);font-weight:800}
+.day .dots{display:flex;gap:2.5px;height:5px}
+.day .dots i{width:4.5px;height:4.5px;border-radius:50%;background:var(--line)}
+.day .dots i.ontime{background:var(--emerald)}
+.day.full .dots i.ontime{background:rgba(255,255,255,.9)}
+[data-theme="dark"] .day.full .dots i.ontime{background:rgba(8,19,14,.8)}
+.day .dots i.qada{background:var(--brass)}
+.day .dots i.missed{background:var(--brick)}
+.day .dots i.travel{background:var(--travel)}
+.day .dots i.missed_travel{background:var(--plum)}
+
+/* ---------- Статистика ---------- */
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}
+.stat{
+  background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:12px 8px;text-align:center;box-shadow:var(--shadow);
+}
+.stat .val{font-size:34px;font-weight:600;line-height:1}
+.stat .lbl{font-size:11.5px;color:var(--muted);font-weight:700;margin-top:5px}
+.streakrow{display:flex;gap:9px;margin-top:0}
+.streakrow .stat{flex:1}
+.bar{height:8px;border-radius:99px;background:var(--none-chip);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--emerald);border-radius:99px;transition:width .4s}
+.prow{padding:9px 0;border-bottom:1px dashed var(--line)}
+.prow:last-child{border-bottom:none}
+.prow .top{display:flex;justify-content:space-between;align-items:baseline;font-size:14px}
+.prow .top b{font-weight:800}
+.badge{font-size:10.5px;font-weight:800;color:var(--brick);background:var(--brick-soft);border-radius:99px;padding:2px 8px;margin-left:6px}
+.qada-big{font-size:46px;font-weight:600;line-height:1}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border-radius:12px;padding:12px 16px;font-weight:800;font-size:14.5px;
+  background:var(--emerald);color:#fff;width:100%;transition:transform .08s;
+}
+[data-theme="dark"] .btn{color:#08130E}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:var(--card-2);color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:var(--brick-soft);color:var(--brick)}
+.btn:disabled{opacity:.45;pointer-events:none}
+.mini{width:42px;height:42px;border-radius:10px;background:var(--card-2);border:1px solid var(--line);font-weight:800;font-size:18px}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.row>.mini{flex:0 0 42px}
+
+/* ---------- Шторка (день) и модальное окно (настройки) ---------- */
+.overlay{
+  position:fixed;inset:0;z-index:40;background:rgba(10,16,13,.5);
+  display:flex;align-items:flex-end;justify-content:center;
+  animation:fade .18s ease;
+}
+/* Атрибут hidden всегда сильнее любых display-правил (иначе .overlay{display:flex} держал бы оверлеи открытыми) */
+[hidden]{display:none !important}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{
+  width:100%;max-width:480px;background:var(--bg);
+  border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:none;
+  padding:14px 16px calc(20px + env(safe-area-inset-bottom));
+  max-height:88dvh;overflow-y:auto;
+  animation:up .22s ease;
+}
+@keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+.sheet .grip{width:44px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 10px}
+.sheet h3{font-size:24px;font-weight:600}
+.sheet .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.sheet-nav{display:flex;align-items:center;gap:10px}
+.sheet-nav-title{flex:1;text-align:center;min-width:0}
+.iconbtn:disabled{opacity:.35;cursor:default}
+.field{margin-top:14px}
+.field label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.seg{display:flex;background:var(--card-2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;padding:9px 6px;border-radius:9px;font-weight:700;font-size:13.5px;color:var(--muted)}
+.seg button.on{background:var(--emerald);color:#fff}
+[data-theme="dark"] .seg button.on{color:#08130E}
+.hr{height:1px;background:var(--line);margin:18px 0 4px}
+
+/* ---------- Тост ---------- */
+#toast{
+  position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(10px);
+  background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:12px;
+  font-size:14px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+  z-index:60;max-width:90%;text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Верхняя панель -->
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span>Намаз-трекер</div>
+    <div class="actions">
+      <button class="iconbtn" id="btn-theme" aria-label="Переключить тему">
+        <svg viewBox="0 0 24 24"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.8 6.8 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <button class="iconbtn" id="btn-settings" aria-label="Настройки">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Вкладки-экраны (наполняются скриптом) -->
+  <main>
+    <section id="view-today"></section>
+    <section id="view-calendar" hidden></section>
+    <section id="view-stats" hidden></section>
+  </main>
+</div>
+
+<!-- Нижняя навигация -->
+<nav class="tabbar" aria-label="Основная навигация">
+  <div class="inner">
+    <button class="tab active" data-tab="today">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="4"/><path d="M12 3v2M4.9 6.6l1.4 1.4M2 13h2M20 13h2M17.7 8l1.4-1.4M5 20h14"/></svg>
+      Сегодня
+    </button>
+    <button class="tab" data-tab="calendar">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      Календарь
+    </button>
+    <button class="tab" data-tab="stats">
+      <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      Статистика
+    </button>
+  </div>
+</nav>
+
+<!-- Шторка редактирования дня -->
+<div class="overlay" id="sheet-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Отметки за день">
+    <div class="grip"></div>
+    <div class="sheet-nav">
+      <button class="iconbtn" id="sheet-prev" aria-label="Предыдущий день"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="sheet-nav-title">
+        <h3 class="serif" id="sheet-date"></h3>
+        <div class="sub" id="sheet-hijri"></div>
+      </div>
+      <button class="iconbtn" id="sheet-next" aria-label="Следующий день"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+    <div class="prayers" id="sheet-prayers"></div>
+    <p class="fine" style="margin-top:10px">Нажатие на строку открывает меню выбора статуса. Всё сохраняется автоматически.</p>
+    <button class="btn ghost" id="sheet-close" style="margin-top:12px">Закрыть</button>
+  </div>
+</div>
+
+<!-- Настройки -->
+<div class="overlay" id="settings-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Настройки">
+    <div class="grip"></div>
+    <h3 class="serif">Настройки</h3>
+
+    <div class="field">
+      <label>Тема</label>
+      <div class="seg" id="seg-theme">
+        <button data-v="auto">Авто</button>
+        <button data-v="light">Светлая</button>
+        <button data-v="dark">Тёмная</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Город для времени намазов</label>
+      <select id="sel-city"></select>
+      <div id="custom-city" style="display:none;margin-top:8px">
+        <input id="in-cityname" placeholder="Название города" style="margin-bottom:8px">
+        <div class="row">
+          <input id="in-lat" type="number" step="0.0001" placeholder="Широта, напр. 51.1694">
+          <input id="in-lng" type="number" step="0.0001" placeholder="Долгота, напр. 71.4491">
+        </div>
+        <button class="btn ghost" id="btn-apply-city" style="margin-top:8px">Применить координаты</button>
+      </div>
+      <p class="fine" style="margin-top:6px">Время отображается по часовому поясу устройства.</p>
+    </div>
+
+    <div class="field">
+      <label>Расчёт Асра (мазхаб)</label>
+      <div class="seg" id="seg-asr">
+        <button data-v="2">Ханафитский</button>
+        <button data-v="1">Стандартный</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Напоминания</label>
+      <button class="btn ghost" id="btn-notify">Включить напоминания</button>
+      <p class="fine" id="notify-status" style="margin-top:6px"></p>
+      <button class="btn ghost" id="btn-ics" style="margin-top:10px">Скачать напоминания в Календарь (.ics)</button>
+      <p class="fine" style="margin-top:6px">Файл с временами намазов на 30 дней. Откройте его и нажмите «Добавить все» — системные уведомления будут приходить точно ко времени, даже когда трекер закрыт. Обновляйте раз в месяц.</p>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="field">
+      <label>Резервная копия</label>
+      <div class="row">
+        <button class="btn ghost" id="btn-export">Скачать JSON</button>
+        <button class="btn ghost" id="btn-copy">Копировать</button>
+      </div>
+      <textarea id="ta-data" rows="4" style="margin-top:8px" placeholder="Сюда можно вставить JSON для импорта — или здесь появится копия ваших данных при экспорте."></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ghost" id="btn-import-file">Импорт из файла</button>
+        <button class="btn" id="btn-import-text">Импорт из текста</button>
+      </div>
+      <input type="file" id="file-import" accept=".json,application/json" hidden>
+      <p class="fine" id="storage-note" style="margin-top:8px"></p>
+    </div>
+
+    <div class="field">
+      <button class="btn danger" id="btn-clear">Стереть все данные</button>
+    </div>
+
+    <div class="hr"></div>
+    <p class="fine">Время рассчитывается астрономически (углы: Фаджр 18°, Иша 17°; в белые ночи — правило доли ночи по углу). Значения могут отличаться от расписания ДУМК на несколько минут — сверяйтесь с местной мечетью.</p>
+    <button class="btn ghost" id="settings-close" style="margin-top:14px">Закрыть</button>
+  </div>
+</div>
+
+<!-- Меню выбора статуса намаза -->
+<div class="overlay" id="picker-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Отметка намаза">
+    <div class="grip"></div>
+    <h3 class="serif" id="picker-title"></h3>
+    <div class="sub" id="picker-sub"></div>
+    <div id="picker-body" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   НАМАЗ-ТРЕКЕР — весь код приложения в одном файле.
+   Разделы: константы → утилиты дат → хранилище → астрономия →
+   состояние → отрисовка → события → запуск.
+   ============================================================ */
+
+/* ---------- 1. Константы ---------- */
+const PRAYERS = [
+  { id:'fajr',    name:'Фаджр',  gen:'Фаджра',  desc:'утренний' },
+  { id:'dhuhr',   name:'Зухр',   gen:'Зухра',   desc:'полуденный' },
+  { id:'asr',     name:'Аср',    gen:'Асра',    desc:'послеполуденный' },
+  { id:'maghrib', name:'Магриб', gen:'Магриба', desc:'вечерний' },
+  { id:'isha',    name:'Иша',    gen:'Иши',     desc:'ночной' },
+];
+// Порядок смены статуса: — → вовремя → в пути → каза → пропущен → пропущен в пути → —
+const STATUS_CYCLE = [null, 'ontime', 'travel', 'qada', 'missed', 'missed_travel'];
+const STATUS_META = {
+  ontime:        { label:'Вовремя',         ic:'✓' },
+  travel:        { label:'В пути',          ic:'➤' },
+  qada:          { label:'Каза',            ic:'↻' },
+  missed:        { label:'Пропущен',        ic:'✕' },
+  missed_travel: { label:'Пропущен в пути', ic:'✕' },
+  none:          { label:'Не отмечен',      ic:'○' },
+};
+const CITIES = [
+  { id:'astana',  name:'Астана',           lat:51.1694, lng:71.4491 },
+  { id:'almaty',  name:'Алматы',           lat:43.2389, lng:76.8897 },
+  { id:'shymkent',name:'Шымкент',          lat:42.3417, lng:69.5901 },
+  { id:'karaganda',name:'Караганда',       lat:49.8047, lng:73.1094 },
+  { id:'aktobe',  name:'Актобе',           lat:50.2839, lng:57.1670 },
+  { id:'atyrau',  name:'Атырау',           lat:47.1164, lng:51.8830 },
+  { id:'aktau',   name:'Актау',            lat:43.6410, lng:51.1985 },
+  { id:'pavlodar',name:'Павлодар',         lat:52.2873, lng:76.9674 },
+  { id:'taraz',   name:'Тараз',            lat:42.9000, lng:71.3667 },
+  { id:'oskemen', name:'Усть-Каменогорск', lat:49.9483, lng:82.6275 },
+  { id:'kostanay',name:'Костанай',         lat:53.2144, lng:63.6246 },
+  { id:'kyzylorda',name:'Кызылорда',       lat:44.8479, lng:65.4999 },
+  { id:'custom',  name:'Другой (координаты)', lat:null, lng:null },
+];
+const STORE_KEY = 'namaz-tracker-v1';
+
+/* ---------- 2. Утилиты дат ---------- */
+// Ключ дня в МЕСТНОМ времени: 'ГГГГ-ММ-ДД' (не toISOString — тот даёт UTC!)
+function localISO(d){
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+function parseISO(s){ const [y,m,dd] = s.split('-').map(Number); return new Date(y, m-1, dd); }
+function todayStr(){ return localISO(new Date()); }
+function addDays(s, n){ const d = parseISO(s); d.setDate(d.getDate()+n); return localISO(d); }
+function cap(s){ return s ? s[0].toUpperCase() + s.slice(1) : s; }
+function fmtDateRu(d){
+  return cap(new Intl.DateTimeFormat('ru-RU', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(d));
+}
+// Дата хиджры через встроенный календарь islamic-umalqura (если поддерживается)
+function hijriStr(d){
+  try{
+    const parts = new Intl.DateTimeFormat('ru-RU-u-ca-islamic-umalqura',
+      { day:'numeric', month:'long', year:'numeric' }).formatToParts(d);
+    const get = t => (parts.find(p => p.type === t) || {}).value || '';
+    const day = get('day'), month = get('month'), year = get('year');
+    if (!day || !year) return '';
+    return day + ' ' + month + ' ' + year + ' г.х.';
+  } catch(e){ return ''; }
+}
+
+/* ---------- 3. Хранилище ----------
+   Приоритет: window.storage (артефакты Claude) → localStorage (обычный
+   браузер) → память (данные живут до перезагрузки; предупреждаем). */
+const store = {
+  mode: 'memory',
+  mem: {},
+  init(){
+    if (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function'){
+      this.mode = 'claude'; return;
+    }
+    try{
+      const k = '__nt_probe__';
+      window.localStorage.setItem(k, '1');
+      window.localStorage.removeItem(k);
+      this.mode = 'local';
+    } catch(e){ this.mode = 'memory'; }
+  },
+  async get(key){
+    if (this.mode === 'claude'){
+      try{ const r = await window.storage.get(key); return r ? r.value : null; }
+      catch(e){ return null; } // ключа ещё нет — это нормально
+    }
+    if (this.mode === 'local'){
+      try{ return window.localStorage.getItem(key); } catch(e){ return null; }
+    }
+    return Object.prototype.hasOwnProperty.call(this.mem, key) ? this.mem[key] : null;
+  },
+  async set(key, val){
+    if (this.mode === 'claude'){
+      try{ await window.storage.set(key, val); } catch(e){ console.error('storage.set', e); }
+      return;
+    }
+    if (this.mode === 'local'){
+      try{ window.localStorage.setItem(key, val); } catch(e){ console.error(e); }
+      return;
+    }
+    this.mem[key] = val;
+  },
+  label(){
+    return this.mode === 'claude' ? 'Хранилище: постоянное (Claude) — данные сохраняются между сессиями.'
+         : this.mode === 'local'  ? 'Хранилище: localStorage браузера — данные сохраняются на этом устройстве.'
+         : 'Внимание: постоянное хранилище недоступно, данные живут только до перезагрузки. Пользуйтесь экспортом!';
+  }
+};
+
+/* ---------- 4. Астрономия: время намазов ----------
+   Компактная реализация алгоритма PrayTimes.org.
+   Углы: Фаджр 18°, Иша 17° (Muslim World League).
+   Аср: фактор тени 2 (ханафи) или 1 (стандарт).
+   Для высоких широт (белые ночи) — правило «доля ночи по углу». */
+const FAJR_ANGLE = 18, ISHA_ANGLE = 17;
+const DTR = Math.PI/180;
+const dsin = d => Math.sin(d*DTR), dcos = d => Math.cos(d*DTR), dtan = d => Math.tan(d*DTR);
+const darcsin = x => Math.asin(x)/DTR, darccos = x => Math.acos(x)/DTR;
+const darctan2 = (y,x) => Math.atan2(y,x)/DTR, darccot = x => Math.atan(1/x)/DTR;
+function fixHour(a){ a = a - 24*Math.floor(a/24); return a < 0 ? a + 24 : a; }
+function fixAngle(a){ a = a - 360*Math.floor(a/360); return a < 0 ? a + 360 : a; }
+function timeDiff(a,b){ return fixHour(b - a); }
+
+// Положение солнца (склонение и уравнение времени) на юлианскую дату
+function sunPosition(jd){
+  const D = jd - 2451545.0;
+  const g = fixAngle(357.529 + 0.98560028*D);
+  const q = fixAngle(280.459 + 0.98564736*D);
+  const L = fixAngle(q + 1.915*dsin(g) + 0.020*dsin(2*g));
+  const e = 23.439 - 0.00000036*D;
+  const RA = darctan2(dcos(e)*dsin(L), dcos(L)) / 15;
+  return { decl: darcsin(dsin(e)*dsin(L)), eqt: q/15 - fixHour(RA) };
+}
+function julian(y, m, d){
+  if (m <= 2){ y -= 1; m += 12; }
+  const A = Math.floor(y/100), B = 2 - A + Math.floor(A/4);
+  return Math.floor(365.25*(y+4716)) + Math.floor(30.6001*(m+1)) + d + B - 1524.5;
+}
+
+/**
+ * Возвращает времена намазов (в часах с плавающей точкой, по местным часам)
+ * для даты date, координат lat/lng и смещения tz (часы от UTC).
+ */
+function computeTimes(date, lat, lng, tz, asrFactor){
+  const jd = julian(date.getFullYear(), date.getMonth()+1, date.getDate()) - lng/(15*24);
+  const mid = t => fixHour(12 - sunPosition(jd + t).eqt);
+  // Время, когда солнце на угле angle ниже горизонта; dir: -1 утро, +1 вечер
+  const angleTime = (angle, t, dir) => {
+    const decl = sunPosition(jd + t).decl;
+    const cosH = (-dsin(angle) - dsin(decl)*dsin(lat)) / (dcos(decl)*dcos(lat));
+    if (cosH < -1 || cosH > 1) return NaN; // солнце не достигает угла (полярные условия)
+    return mid(t) + dir * darccos(cosH)/15;
+  };
+  const asrTime = (factor, t) => {
+    const decl = sunPosition(jd + t).decl;
+    const angle = -darccot(factor + dtan(Math.abs(lat - decl)));
+    return angleTime(angle, t, +1);
+  };
+  // Две итерации: сначала грубые времена, затем уточнение
+  let T = { fajr:5, sunrise:6, dhuhr:12, asr:13, maghrib:18, isha:18 };
+  for (let i = 0; i < 2; i++){
+    T = {
+      fajr:    angleTime(FAJR_ANGLE, T.fajr/24, -1),
+      sunrise: angleTime(0.833,      T.sunrise/24, -1),
+      dhuhr:   mid(T.dhuhr/24),
+      asr:     asrTime(asrFactor,    T.asr/24),
+      maghrib: angleTime(0.833,      T.maghrib/24, +1),
+      isha:    angleTime(ISHA_ANGLE, T.isha/24, +1),
+    };
+  }
+  // Солнечное время → часы по местным часам
+  const shift = tz - lng/15;
+  for (const k in T) T[k] = isNaN(T[k]) ? NaN : fixHour(T[k] + shift);
+  // Коррекция высоких широт («доля ночи по углу»)
+  if (!isNaN(T.sunrise) && !isNaN(T.maghrib)){
+    const night = timeDiff(T.maghrib, T.sunrise);
+    const pF = FAJR_ANGLE/60 * night, pI = ISHA_ANGLE/60 * night;
+    if (isNaN(T.fajr) || timeDiff(T.fajr, T.sunrise) > pF) T.fajr = fixHour(T.sunrise - pF);
+    if (isNaN(T.isha) || timeDiff(T.maghrib, T.isha) > pI) T.isha = fixHour(T.maghrib + pI);
+  }
+  return T;
+}
+
+function fmtHM(h){
+  if (isNaN(h)) return '—';
+  let mins = Math.round(h*60) % (24*60);
+  const H = Math.floor(mins/60), M = mins % 60;
+  return String(H).padStart(2,'0') + ':' + String(M).padStart(2,'0');
+}
+
+/* ---------- 5. Состояние приложения ---------- */
+const DEFAULT_STATE = {
+  version: 1,
+  days: {},         // 'ГГГГ-ММ-ДД' → { fajr:'ontime'|'qada'|'missed', ... }
+  manualQada: 0,    // долг, накопленный до начала ведения трекера
+  firstDay: null,   // первый день использования — граница статистики
+  settings: {
+    theme:'auto', cityId:'astana',
+    customName:'', customLat:null, customLng:null,
+    asrFactor:2, notify:false,
+  },
+};
+let state = null;
+let currentDay = todayStr();   // для смены дня в полночь
+let activeTab = 'today';
+let calCursor = null;          // {y, m} — показанный месяц календаря
+let sheetDate = null;          // дата, открытая в шторке
+let timesCache = {};           // кэш расчётов времени по дням
+let lastNotifyCheck = Date.now();
+let saveTimer = null;
+
+function save(immediate){
+  clearTimeout(saveTimer);
+  const doSave = () => store.set(STORE_KEY, JSON.stringify(state));
+  if (immediate) doSave(); else saveTimer = setTimeout(doSave, 250);
+}
+// Аккуратно накладываем сохранённое на дефолты (устойчивость к старым версиям)
+function hydrate(raw){
+  const s = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  if (raw && typeof raw === 'object'){
+    if (raw.days && typeof raw.days === 'object'){
+      for (const k in raw.days){
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+        const rec = {};
+        for (const p of PRAYERS){
+          const v = raw.days[k] && raw.days[k][p.id];
+          if (v === 'ontime' || v === 'travel' || v === 'qada' || v === 'missed' || v === 'missed_travel') rec[p.id] = v;
+        }
+        if (Object.keys(rec).length) s.days[k] = rec;
+      }
+    }
+    if (Number.isFinite(raw.manualQada) && raw.manualQada >= 0) s.manualQada = Math.floor(raw.manualQada);
+    if (typeof raw.firstDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.firstDay)) s.firstDay = raw.firstDay;
+    if (raw.settings && typeof raw.settings === 'object'){
+      const t = raw.settings;
+      if (['auto','light','dark'].includes(t.theme)) s.settings.theme = t.theme;
+      if (CITIES.some(c => c.id === t.cityId)) s.settings.cityId = t.cityId;
+      if (typeof t.customName === 'string') s.settings.customName = t.customName.slice(0,40);
+      if (Number.isFinite(t.customLat)) s.settings.customLat = t.customLat;
+      if (Number.isFinite(t.customLng)) s.settings.customLng = t.customLng;
+      if (t.asrFactor === 1 || t.asrFactor === 2) s.settings.asrFactor = t.asrFactor;
+      s.settings.notify = !!t.notify;
+    }
+  }
+  return s;
+}
+function getCity(){
+  const c = CITIES.find(x => x.id === state.settings.cityId) || CITIES[0];
+  if (c.id === 'custom'){
+    return {
+      name: state.settings.customName || 'Свои координаты',
+      lat: state.settings.customLat, lng: state.settings.customLng,
+    };
+  }
+  return c;
+}
+// Времена намазов на дату (с кэшем); null — если координаты не заданы
+function timesFor(dateStr){
+  const c = getCity();
+  if (!Number.isFinite(c.lat) || !Number.isFinite(c.lng)) return null;
+  const key = dateStr + '|' + c.lat + '|' + c.lng + '|' + state.settings.asrFactor;
+  if (timesCache[key]) return timesCache[key];
+  const d = parseISO(dateStr);
+  const tz = -d.getTimezoneOffset()/60; // пояс устройства на эту дату
+  const t = computeTimes(d, c.lat, c.lng, tz, state.settings.asrFactor);
+  timesCache[key] = t;
+  return t;
+}
+function statusOf(dateStr, pid){
+  const rec = state.days[dateStr];
+  return rec && rec[pid] ? rec[pid] : null;
+}
+function setStatus(dateStr, pid, st){
+  if (!state.days[dateStr]) state.days[dateStr] = {};
+  if (st === null) delete state.days[dateStr][pid];
+  else state.days[dateStr][pid] = st;
+  if (Object.keys(state.days[dateStr]).length === 0) delete state.days[dateStr];
+  if (!state.firstDay || dateStr < state.firstDay) state.firstDay = dateStr;
+  save();
+}
+function cycleStatus(dateStr, pid){
+  const cur = statusOf(dateStr, pid);
+  const i = STATUS_CYCLE.indexOf(cur);
+  setStatus(dateStr, pid, STATUS_CYCLE[(i+1) % STATUS_CYCLE.length]);
+}
+const isDone = st => st === 'ontime' || st === 'travel' || st === 'qada';
+function isFullDay(dateStr){
+  const rec = state.days[dateStr];
+  return !!rec && PRAYERS.every(p => isDone(rec[p.id]));
+}
+
+/* ---------- 6. Отрисовка ---------- */
+const $ = s => document.querySelector(s);
+
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._tm);
+  toast._tm = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// Дуга дня: путь солнца от рассвета до ночи, 5 сегментов-намазов
+function arcHTML(dateStr){
+  const cx = 150, cy = 150, r = 125, gap = 7;
+  const seg = (180 - gap*4) / 5;
+  const pt = a => (cx + r*Math.cos(a*DTR)).toFixed(2) + ' ' + (cy - r*Math.sin(a*DTR)).toFixed(2);
+  let paths = '';
+  PRAYERS.forEach((p, i) => {
+    const a0 = 180 - i*(seg+gap), a1 = a0 - seg;
+    const st = statusOf(dateStr, p.id) || 'none';
+    paths += '<path class="arc-seg ' + st + '" d="M ' + pt(a0) + ' A ' + r + ' ' + r + ' 0 0 1 ' + pt(a1) + '"/>';
+  });
+  return '<svg viewBox="0 0 300 158" aria-hidden="true">' + paths + '</svg>';
+}
+
+function chipHTML(st){
+  const m = STATUS_META[st || 'none'];
+  return '<span class="chip ' + (st || '') + '"><span class="ic">' + m.ic + '</span>' + m.label + '</span>';
+}
+
+// Строки пяти намазов для даты (используются на «Сегодня» и в шторке дня)
+function prayerRowsHTML(dateStr, nextPid){
+  const t = timesFor(dateStr);
+  const now = new Date();
+  // Времена намазов хранятся числом часов (напр. 12.32), сравниваем в тех же единицах
+  const nowH = now.getHours() + now.getMinutes()/60 + now.getSeconds()/3600;
+  const isToday = dateStr === currentDay;
+  return PRAYERS.map(p => {
+    const st = statusOf(dateStr, p.id);
+    const time = t ? fmtHM(t[p.id]) : '';
+    const next = nextPid === p.id ? ' next' : '';
+    // Сегодняшний намаз, чьё время ещё не пришло, отметить нельзя
+    // (если статус уже стоит — например, после импорта — оставляем возможность его снять)
+    const locked = isToday && !st && t && !isNaN(t[p.id]) && nowH < t[p.id];
+    const aria = locked
+      ? p.name + ': время ещё не наступило'
+      : p.name + ': ' + STATUS_META[st || 'none'].label + '. Нажмите, чтобы изменить';
+    const chip = locked
+      ? '<span class="chip locked-chip"><span class="ic">◷</span>Не наступил</span>'
+      : chipHTML(st);
+    return '<button class="prayer' + next + (locked ? ' locked' : '') +
+      '" data-date="' + dateStr + '" data-pid="' + p.id + '"' +
+      (locked ? ' data-locked="1"' : '') +
+      ' aria-label="' + aria + '">' +
+      '<div class="info"><div class="name">' + p.name +
+      (time ? ' <span class="sub tnum">· ' + time + '</span>' : '') + '</div>' +
+      '<div class="sub">' + p.desc + '</div></div>' +
+      chip + '</button>';
+  }).join('');
+}
+
+function legendHTML(){
+  return '<div class="legend">' +
+    '<span><i style="background:var(--emerald)"></i>вовремя</span>' +
+    '<span><i style="background:var(--travel)"></i>в пути</span>' +
+    '<span><i style="background:var(--brass)"></i>каза</span>' +
+    '<span><i style="background:var(--brick)"></i>пропущен</span>' +
+    '<span><i style="background:var(--plum)"></i>пропущен в пути</span>' +
+    '<span><i style="background:var(--line)"></i>не отмечен</span></div>';
+}
+
+let lastNextPid = null;
+
+function nextPrayerInfo(){
+  const t = timesFor(currentDay);
+  if (!t) return null;
+  const now = new Date();
+  const nowH = now.getHours() + now.getMinutes()/60 + now.getSeconds()/3600;
+  const mk = (p, h, dh, tomorrow) => {
+    const mins = Math.max(0, Math.round(dh*60));
+    const H = Math.floor(mins/60), M = mins % 60;
+    return {
+      todayPid: tomorrow ? null : p.id,
+      label: 'До ' + p.gen + (tomorrow ? ' (завтра)' : '') + ' · ' + fmtHM(h),
+      rel: H > 0 ? 'через ' + H + ' ч ' + M + ' мин' : 'через ' + M + ' мин',
+    };
+  };
+  for (const p of PRAYERS){
+    const h = t[p.id];
+    if (!isNaN(h) && h > nowH) return mk(p, h, h - nowH, false);
+  }
+  const t2 = timesFor(addDays(currentDay, 1));
+  if (t2 && !isNaN(t2.fajr)) return mk(PRAYERS[0], t2.fajr, (24 - nowH) + t2.fajr, true);
+  return null;
+}
+
+function renderToday(){
+  const d = parseISO(currentDay);
+  const rec = state.days[currentDay] || {};
+  const done = PRAYERS.filter(p => isDone(rec[p.id])).length;
+  const hijri = hijriStr(d);
+  const t = timesFor(currentDay);
+  const ni = nextPrayerInfo();
+  lastNextPid = ni ? ni.todayPid : null;
+
+  $('#view-today').innerHTML =
+    '<div class="card datecard">' +
+      '<div class="date-g serif">' + fmtDateRu(d) + '</div>' +
+      (hijri ? '<div class="date-h">' + hijri + '</div>' : '') +
+      (t && !isNaN(t.sunrise) ? '<div class="sunrise tnum">восход · ' + fmtHM(t.sunrise) + '</div>' : '') +
+      '<div class="arcwrap">' + arcHTML(currentDay) +
+        '<div class="arc-center">' +
+          '<div class="arc-count tnum">' + done + '<small> / 5</small></div>' +
+          '<div class="arc-sub">выполнено</div>' +
+        '</div>' +
+      '</div>' +
+      (ni ? '<div class="nextline" id="nextline"><span class="pulse"></span>' +
+            '<span id="next-label" class="tnum">' + ni.label + '</span>' +
+            '<span id="next-rel">' + ni.rel + '</span></div>'
+          : '') +
+    '</div>' +
+    '<div class="prayers">' + prayerRowsHTML(currentDay, lastNextPid) + '</div>' +
+    legendHTML();
+}
+
+/* --- Календарь --- */
+function renderCalendar(){
+  if (!calCursor){ const n = new Date(); calCursor = { y:n.getFullYear(), m:n.getMonth() }; }
+  const { y, m } = calCursor;
+  const title = cap(new Intl.DateTimeFormat('ru-RU', { month:'long', year:'numeric' }).format(new Date(y, m, 1)));
+  const firstDow = (new Date(y, m, 1).getDay() + 6) % 7; // Пн = 0
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+
+  let cells = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d => '<div class="dow">' + d + '</div>').join('');
+  for (let i = 0; i < firstDow; i++) cells += '<div class="day out"></div>';
+  for (let dd = 1; dd <= daysInMonth; dd++){
+    const ds = localISO(new Date(y, m, dd));
+    const rec = state.days[ds];
+    const cls = ['day'];
+    if (ds > currentDay) cls.push('future');
+    if (ds === currentDay) cls.push('today');
+    if (isFullDay(ds)) cls.push('full');
+    if (rec && PRAYERS.some(p => rec[p.id] === 'missed' || rec[p.id] === 'missed_travel')) cls.push('miss');
+    // Пять точек-статусов: если есть отметки или день уже в периоде учёта
+    let dots = '';
+    if (rec || (state.firstDay && ds >= state.firstDay && ds <= currentDay)){
+      dots = '<span class="dots">' + PRAYERS.map(p =>
+        '<i class="' + (statusOf(ds, p.id) || '') + '"></i>').join('') + '</span>';
+    }
+    cells += '<button class="' + cls.join(' ') + '" data-day="' + ds + '" aria-label="' + ds + '">' +
+             dd + dots + '</button>';
+  }
+
+  $('#view-calendar').innerHTML =
+    '<div class="cal-head">' +
+      '<div class="cal-title serif" id="cal-title">' + title + '</div>' +
+      '<div class="cal-nav">' +
+        '<button class="iconbtn" id="cal-prev" aria-label="Предыдущий месяц"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>' +
+        '<button class="iconbtn" id="cal-next" aria-label="Следующий месяц"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="cal-grid">' + cells + '</div>' +
+    '<div class="card"><h2>Как читать</h2><p class="fine">Зелёный день — выполнены все 5 намазов (вовремя или каза). Точки под числом — статусы каждого намаза. Нажмите на любой прошедший день, чтобы отметить намазы задним числом.</p></div>';
+}
+
+/* --- Статистика --- */
+function rangeStats(windowDays){
+  let from = state.firstDay || currentDay;
+  if (windowDays){
+    const wFrom = addDays(currentDay, -(windowDays-1));
+    if (wFrom > from) from = wFrom;
+  }
+  let total = 0, done = 0;
+  if (state.firstDay){
+    for (let d = from; d <= currentDay; d = addDays(d, 1)){
+      const rec = state.days[d] || {};
+      for (const p of PRAYERS){
+        const st = rec[p.id] || null;
+        if (d === currentDay && !st) continue; // сегодняшние ещё не отмеченные не учитываем
+        total++;
+        if (isDone(st)) done++;
+      }
+    }
+  }
+  return { total, done, pct: total ? Math.round(done/total*100) : null };
+}
+
+function streaks(){
+  let cur = 0, d = currentDay;
+  if (!isFullDay(d)) d = addDays(d, -1); // день ещё идёт — серию не рвём
+  while (isFullDay(d)){ cur++; d = addDays(d, -1); }
+  let best = 0, run = 0;
+  if (state.firstDay){
+    for (let x = state.firstDay; x <= currentDay; x = addDays(x, 1)){
+      if (isFullDay(x)){ run++; if (run > best) best = run; }
+      else run = 0;
+    }
+  }
+  return { cur, best: Math.max(best, cur) };
+}
+
+function prayerBreakdown(){
+  const res = PRAYERS.map(p => ({ id:p.id, name:p.name, done:0, missed:0, total:0 }));
+  if (!state.firstDay) return res;
+  for (let d = state.firstDay; d <= currentDay; d = addDays(d, 1)){
+    const rec = state.days[d] || {};
+    for (const r of res){
+      const st = rec[r.id] || null;
+      if (d === currentDay && !st) continue;
+      r.total++;
+      if (isDone(st)) r.done++;
+      if (st === 'missed' || st === 'missed_travel') r.missed++;
+    }
+  }
+  return res;
+}
+
+// Все явно пропущенные намазы, от старых к новым (очередь долга каза)
+function missedList(){
+  const out = [];
+  for (const d of Object.keys(state.days).sort()){
+    for (const p of PRAYERS){
+      const st = state.days[d][p.id];
+      if (st === 'missed' || st === 'missed_travel')
+        out.push({ d, pid:p.id, name:p.name, travel: st === 'missed_travel' });
+    }
+  }
+  return out;
+}
+
+function renderStats(){
+  const s7 = rangeStats(7), s30 = rangeStats(30), sAll = rangeStats(null);
+  const st = streaks();
+  const br = prayerBreakdown();
+  const missed = missedList();
+  const debt = state.manualQada + missed.length;
+  const mtCnt = missed.filter(m => m.travel).length;
+  const worst = br.reduce((a, b) => (b.missed > (a ? a.missed : 0) ? b : a), null);
+  const pctTxt = v => v.pct === null ? '—' : v.pct + '%';
+  const subTxt = v => v.total ? '<div class="fine tnum" style="margin-top:3px">' + v.done + ' из ' + v.total + '</div>' : '';
+
+  const rows = br.map(r => {
+    const pct = r.total ? Math.round(r.done / r.total * 100) : null;
+    const isWorst = worst && worst.missed > 0 && worst.id === r.id;
+    const line = pct === null ? 'нет данных' : pct + '% · ' + r.done + ' из ' + r.total + ' · пропусков: ' + r.missed;
+    return '<div class="prow"><div class="top"><b>' + r.name +
+      (isWorst ? '<span class="badge">чаще всего пропускается</span>' : '') +
+      '</b><span class="fine tnum">' + line + '</span></div>' +
+      '<div class="bar"><i style="width:' + (pct || 0) + '%"></i></div></div>';
+  }).join('');
+
+  $('#view-stats').innerHTML =
+    '<div class="statgrid">' +
+      '<div class="stat"><div class="val tnum">' + pctTxt(s7) + '</div><div class="lbl">7 дней</div>' + subTxt(s7) + '</div>' +
+      '<div class="stat"><div class="val tnum">' + pctTxt(s30) + '</div><div class="lbl">30 дней</div>' + subTxt(s30) + '</div>' +
+      '<div class="stat"><div class="val tnum">' + pctTxt(sAll) + '</div><div class="lbl">всё время</div>' + subTxt(sAll) + '</div>' +
+    '</div>' +
+    '<div class="statgrid" style="grid-template-columns:1fr 1fr">' +
+      '<div class="stat"><div class="val tnum">' + st.cur + '</div><div class="lbl">текущая серия, дней</div></div>' +
+      '<div class="stat"><div class="val tnum">' + st.best + '</div><div class="lbl">рекордная серия</div></div>' +
+    '</div>' +
+    '<div class="card"><h2>Долг каза</h2>' +
+      '<div style="display:flex;align-items:center;gap:14px">' +
+        '<div class="qada-big tnum">' + debt + '</div>' +
+        '<div class="fine">намаз(ов) к восполнению<br>отмечено в календаре: ' + missed.length + (mtCnt ? ' (в пути: ' + mtCnt + ')' : '') + ' · долг до трекера: ' + state.manualQada + '</div>' +
+      '</div>' +
+      '<button class="btn" id="btn-makeup" style="margin-top:12px"' + (debt === 0 ? ' disabled' : '') + '>Восполнил один</button>' +
+      '<div class="row" style="margin-top:10px">' +
+        '<button class="mini" id="btn-mq-minus" aria-label="Уменьшить долг до трекера">−</button>' +
+        '<span class="fine" style="text-align:center">долг до начала учёта</span>' +
+        '<button class="mini" id="btn-mq-plus" aria-label="Увеличить долг до трекера">+</button>' +
+      '</div>' +
+      '<p class="fine" style="margin-top:10px">Кнопка сначала списывает старый долг, затем помечает самый ранний «пропущен» в календаре как «каза».</p>' +
+    '</div>' +
+    '<div class="card"><h2>По каждому намазу</h2>' +
+    '<div class="fine" style="margin:2px 0 10px">Каждый показатель считается отдельно: доля дней, когда этот намаз выполнен</div>' + rows +
+      '<p class="fine" style="margin-top:10px">Доля выполненных (вовремя + каза) с первого дня учёта. Прошлые дни без отметок считаются невыполненными в процентах, но не попадают в долг каза.</p>' +
+    '</div>';
+}
+
+function renderAll(){
+  if (activeTab === 'today') renderToday();
+  if (activeTab === 'calendar') renderCalendar();
+  if (activeTab === 'stats') renderStats();
+  if (sheetDate) renderSheet();
+}
+
+/* --- Шторка дня (редактирование задним числом) --- */
+function renderSheet(){
+  const d = parseISO(sheetDate);
+  $('#sheet-date').textContent = fmtDateRu(d);
+  const h = hijriStr(d);
+  $('#sheet-hijri').textContent = h ? h : '';
+  $('#sheet-prayers').innerHTML = prayerRowsHTML(sheetDate, null);
+  $('#sheet-next').disabled = sheetDate >= todayStr(); // в будущее нельзя
+}
+function openSheet(ds){
+  sheetDate = ds;
+  const d = parseISO(ds);
+  if (calCursor && (calCursor.y !== d.getFullYear() || calCursor.m !== d.getMonth())){
+    calCursor = { y: d.getFullYear(), m: d.getMonth() };
+    if (activeTab === 'calendar') renderCalendar();
+  }
+  renderSheet();
+  $('#sheet-overlay').hidden = false;
+}
+/* ---------- Меню выбора статуса намаза ---------- */
+let pickDate = null, pickPid = null;
+
+function openPicker(dateStr, pid){
+  pickDate = dateStr; pickPid = pid;
+  renderPicker(1);
+  $('#picker-overlay').hidden = false;
+}
+function closePicker(){
+  $('#picker-overlay').hidden = true;
+  pickDate = pickPid = null;
+}
+// step 1 — основной выбор; step 2 — уточнение «обычный или в пути»
+function renderPicker(step, base){
+  const p = PRAYERS.find(x => x.id === pickPid);
+  const cur = statusOf(pickDate, pickPid);
+  const nice = new Intl.DateTimeFormat('ru-RU', { day:'numeric', month:'long' }).format(parseISO(pickDate));
+  $('#picker-title').textContent = p.name;
+  $('#picker-sub').textContent = cap(p.desc) + ' · ' + nice + (cur ? ' · сейчас: ' + STATUS_META[cur].label.toLowerCase() : '');
+  let html = '';
+  if (step === 1){
+    html =
+      '<button class="pick-opt ontime" data-pick-final="ontime"><span class="ic">✓</span>Выполнил</button>' +
+      '<button class="pick-opt qada" data-pick-final="qada"><span class="ic">↻</span>Каза — восполнил позже</button>' +
+      '<button class="pick-opt missed" data-pick="missed"><span class="ic">✕</span>Пропустил</button>' +
+      (cur ? '<button class="pick-opt clear" data-pick-final="clear"><span class="ic">○</span>Снять отметку</button>' : '') +
+      '<button class="pick-back" data-pick="cancel">Отмена</button>';
+  } else {
+    // Уточнение только для пропуска: обычный или в пути (сафар)
+    html =
+      '<div class="fine" style="margin-top:10px">Какой это был намаз?</div>' +
+      '<button class="pick-opt missed" data-pick-final="missed"><span class="ic">✕</span>Обычный</button>' +
+      '<button class="pick-opt missed_travel" data-pick-final="missed_travel"><span class="ic">✕</span>В пути (сафар)</button>' +
+      '<button class="pick-back" data-pick="back">← Назад</button>';
+  }
+  $('#picker-body').innerHTML = html;
+}
+function applyPick(v){
+  setStatus(pickDate, pickPid, v === 'clear' ? null : v);
+  closePicker();
+  renderAll();
+}
+
+function closeSheet(){
+  sheetDate = null;
+  $('#sheet-overlay').hidden = true;
+}
+
+/* ---------- 7. Тема ---------- */
+const darkMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function resolvedTheme(){
+  const t = state.settings.theme;
+  if (t === 'auto') return darkMQ && darkMQ.matches ? 'dark' : 'light';
+  return t;
+}
+function applyTheme(){
+  document.documentElement.dataset.theme = resolvedTheme();
+  syncSeg('#seg-theme', state.settings.theme);
+}
+if (window.matchMedia){
+  darkMQ.addEventListener('change', () => { if (state && state.settings.theme === 'auto') applyTheme(); });
+}
+
+/* ---------- 8. Настройки ---------- */
+function syncSeg(sel, value){
+  document.querySelectorAll(sel + ' button').forEach(b =>
+    b.classList.toggle('on', b.dataset.v === String(value)));
+}
+function buildCitySelect(){
+  const el = $('#sel-city');
+  el.innerHTML = '';
+  for (const c of CITIES){
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.name; // textContent — безопасно для любых названий
+    el.appendChild(o);
+  }
+}
+function notifySupported(){
+  return typeof Notification !== 'undefined' && typeof Notification.requestPermission === 'function';
+}
+function syncSettingsUI(){
+  syncSeg('#seg-theme', state.settings.theme);
+  syncSeg('#seg-asr', state.settings.asrFactor);
+  $('#sel-city').value = state.settings.cityId;
+  $('#custom-city').style.display = state.settings.cityId === 'custom' ? 'block' : 'none';
+  $('#in-cityname').value = state.settings.customName || '';
+  $('#in-lat').value = state.settings.customLat ?? '';
+  $('#in-lng').value = state.settings.customLng ?? '';
+  $('#btn-notify').textContent = state.settings.notify ? 'Выключить напоминания' : 'Включить напоминания';
+  $('#notify-status').textContent = !state.settings.notify
+    ? 'Выключены.'
+    : (notifySupported() && Notification.permission === 'granted')
+      ? 'Включены: системное уведомление + подсказка в приложении. Работают, пока вкладка открыта.'
+      : 'Включены: всплывающая подсказка в приложении (системные уведомления здесь недоступны). Работают, пока вкладка открыта.';
+  $('#storage-note').textContent = store.label();
+}
+
+/* Двухшаговое подтверждение опасных действий: первый клик «взводит» кнопку */
+function armed(btn, fn){
+  if (btn.dataset.armed === '1'){
+    btn.dataset.armed = '';
+    btn.textContent = btn.dataset.orig;
+    fn();
+    return;
+  }
+  btn.dataset.orig = btn.textContent;
+  btn.dataset.armed = '1';
+  btn.textContent = 'Точно? Нажмите ещё раз';
+  setTimeout(() => {
+    if (btn.dataset.armed === '1'){ btn.dataset.armed = ''; btn.textContent = btn.dataset.orig; }
+  }, 3500);
+}
+
+/* ---------- 9. Экспорт / импорт ---------- */
+// Календарный файл (.ics): события намазов на N дней вперёд с уведомлением в момент наступления.
+// Времена «плавающие» (без часового пояса) — срабатывают по местным часам телефона.
+function buildICS(nDays){
+  const pad = n => String(n).padStart(2, '0');
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Namaz Tracker//RU',
+             'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Времена намазов'];
+  let d = todayStr();
+  for (let i = 0; i < nDays; i++){
+    const t = timesFor(d);
+    if (t){
+      const ds = d.replace(/-/g, '');
+      for (const p of PRAYERS){
+        const h = t[p.id];
+        if (isNaN(h)) continue;
+        let mins = Math.round(h * 60);
+        if (mins >= 1439) mins = 1438;             // край суток
+        const end = Math.min(mins + 10, 1439);      // событие на 10 минут
+        L.push('BEGIN:VEVENT',
+               'UID:' + d + '-' + p.id + '@namaz-tracker',
+               'DTSTAMP:' + stamp,
+               'DTSTART:' + ds + 'T' + pad(Math.floor(mins / 60)) + pad(mins % 60) + '00',
+               'DTEND:' + ds + 'T' + pad(Math.floor(end / 60)) + pad(end % 60) + '00',
+               'SUMMARY:' + p.name + ' · ' + fmtHM(h),
+               'BEGIN:VALARM', 'ACTION:DISPLAY',
+               'DESCRIPTION:Время намаза — ' + p.name,
+               'TRIGGER:-PT0M', 'END:VALARM',
+               'END:VEVENT');
+      }
+    }
+    d = addDays(d, 1);
+  }
+  L.push('END:VCALENDAR');
+  return L.join('\r\n');
+}
+
+function exportJSON(){
+  const json = JSON.stringify(state, null, 2);
+  $('#ta-data').value = json;
+  try{
+    const blob = new Blob([json], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'namaz-tracker-' + todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('Экспортировано. Копия JSON — в поле ниже.');
+  } catch(e){
+    toast('Скачивание здесь недоступно — скопируйте JSON из поля.');
+  }
+}
+async function copyJSON(){
+  const json = JSON.stringify(state);
+  $('#ta-data').value = json;
+  try{
+    await navigator.clipboard.writeText(json);
+    toast('Скопировано в буфер обмена');
+  } catch(e){
+    const ta = $('#ta-data');
+    ta.focus(); ta.select();
+    try{ document.execCommand('copy'); toast('Скопировано'); }
+    catch(e2){ toast('Выделите текст в поле и скопируйте вручную'); }
+  }
+}
+function importFromText(text){
+  let raw;
+  try{ raw = JSON.parse(text); }
+  catch(e){ toast('Не получилось прочитать JSON — проверьте текст'); return; }
+  if (!raw || typeof raw !== 'object' || typeof raw.days !== 'object'){
+    toast('Файл не похож на резервную копию трекера'); return;
+  }
+  state = hydrate(raw);
+  // Если в копии не было firstDay — восстановим по самой ранней записи
+  const keys = Object.keys(state.days).sort();
+  if (!state.firstDay && keys.length) state.firstDay = keys[0];
+  timesCache = {};
+  save(true);
+  applyTheme();
+  syncSettingsUI();
+  renderAll();
+  toast('Импортировано: дней с отметками — ' + keys.length);
+}
+
+/* ---------- 10. Напоминания ---------- */
+function checkNotifications(){
+  const now = Date.now();
+  if (!state.settings.notify){ lastNotifyCheck = now; return; }
+  const t = timesFor(currentDay);
+  if (!t){ lastNotifyCheck = now; return; }
+  const base = parseISO(currentDay).getTime();
+  for (const p of PRAYERS){
+    const h = t[p.id];
+    if (isNaN(h)) continue;
+    const ts = base + Math.round(h*3600*1000);
+    if (ts > lastNotifyCheck && ts <= now){
+      const msg = 'Наступило время намаза ' + p.name + ' (' + fmtHM(h) + ')';
+      toast(msg);
+      if (notifySupported() && Notification.permission === 'granted'){
+        try{ new Notification('Намаз-трекер', { body: msg }); } catch(e){}
+      }
+    }
+  }
+  lastNotifyCheck = now;
+}
+
+/* ---------- 11. События ---------- */
+function setTab(name){
+  activeTab = name;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  $('#view-today').hidden = name !== 'today';
+  $('#view-calendar').hidden = name !== 'calendar';
+  $('#view-stats').hidden = name !== 'stats';
+  renderAll();
+}
+
+function bindEvents(){
+  // Вкладки
+  document.querySelectorAll('.tab').forEach(b =>
+    b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+  // Делегирование кликов: строки намазов, дни календаря, кнопки статистики
+  document.addEventListener('click', e => {
+    const pf = e.target.closest('[data-pick-final]');
+    if (pf){ applyPick(pf.dataset.pickFinal); return; }
+    const pk = e.target.closest('[data-pick]');
+    if (pk){
+      if (pk.dataset.pick === 'cancel') closePicker();
+      else if (pk.dataset.pick === 'back') renderPicker(1);
+      else renderPicker(2, pk.dataset.pick);
+      return;
+    }
+    const pr = e.target.closest('.prayer');
+    if (pr){
+      if (pr.dataset.locked){
+        const p = PRAYERS.find(x => x.id === pr.dataset.pid);
+        const t = timesFor(pr.dataset.date);
+        const tm = t && !isNaN(t[p.id]) ? ' — наступит в ' + fmtHM(t[p.id]) : '';
+        toast('Время ' + p.gen + ' ещё не пришло' + tm);
+        return;
+      }
+      openPicker(pr.dataset.date, pr.dataset.pid);
+      return;
+    }
+    const day = e.target.closest('.day[data-day]');
+    if (day){ openSheet(day.dataset.day); return; }
+    if (e.target.closest('#cal-prev')){
+      calCursor.m--; if (calCursor.m < 0){ calCursor.m = 11; calCursor.y--; }
+      renderCalendar(); return;
+    }
+    if (e.target.closest('#cal-next')){
+      calCursor.m++; if (calCursor.m > 11){ calCursor.m = 0; calCursor.y++; }
+      renderCalendar(); return;
+    }
+    if (e.target.closest('#btn-makeup')){
+      const missed = missedList();
+      if (state.manualQada > 0){
+        state.manualQada--;
+        toast('Списан старый долг. Осталось всего: ' + (state.manualQada + missed.length));
+      } else if (missed.length){
+        const m = missed[0];
+        state.days[m.d][m.pid] = 'qada';
+        const nice = new Intl.DateTimeFormat('ru-RU', { day:'numeric', month:'short' }).format(parseISO(m.d));
+        toast(m.name + ' за ' + nice + (m.travel ? ' (был в пути)' : '') + ' отмечен как каза');
+      }
+      save(); renderAll(); return;
+    }
+    if (e.target.closest('#btn-mq-plus')){ state.manualQada++; save(); renderStats(); return; }
+    if (e.target.closest('#btn-mq-minus')){
+      if (state.manualQada > 0){ state.manualQada--; save(); renderStats(); }
+      return;
+    }
+  });
+
+  // Шторка дня
+  $('#sheet-close').addEventListener('click', closeSheet);
+  $('#sheet-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeSheet(); });
+  $('#sheet-prev').addEventListener('click', () => { if (sheetDate) openSheet(addDays(sheetDate, -1)); });
+  $('#sheet-next').addEventListener('click', () => { if (sheetDate && sheetDate < todayStr()) openSheet(addDays(sheetDate, 1)); });
+
+  // Настройки: открыть/закрыть
+  $('#btn-settings').addEventListener('click', () => { syncSettingsUI(); $('#settings-overlay').hidden = false; });
+  $('#settings-close').addEventListener('click', () => { $('#settings-overlay').hidden = true; });
+  $('#settings-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
+  $('#picker-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closePicker(); });
+
+  // Быстрый переключатель темы в шапке
+  $('#btn-theme').addEventListener('click', () => {
+    state.settings.theme = resolvedTheme() === 'dark' ? 'light' : 'dark';
+    applyTheme(); save();
+  });
+  $('#seg-theme').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.settings.theme = b.dataset.v;
+    applyTheme(); save();
+  });
+
+  // Город и Аср
+  $('#sel-city').addEventListener('change', e => {
+    state.settings.cityId = e.target.value;
+    timesCache = {};
+    save(); syncSettingsUI(); renderAll();
+  });
+  $('#btn-apply-city').addEventListener('click', () => {
+    const lat = parseFloat($('#in-lat').value), lng = parseFloat($('#in-lng').value);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 89 || Math.abs(lng) > 180){
+      toast('Введите корректные широту и долготу'); return;
+    }
+    state.settings.customName = $('#in-cityname').value.trim();
+    state.settings.customLat = lat;
+    state.settings.customLng = lng;
+    timesCache = {};
+    save(); renderAll();
+    toast('Координаты применены');
+  });
+  $('#seg-asr').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.settings.asrFactor = Number(b.dataset.v);
+    timesCache = {};
+    save(); syncSeg('#seg-asr', state.settings.asrFactor); renderAll();
+  });
+
+  // Напоминания
+  $('#btn-ics').addEventListener('click', () => {
+    try{
+      const blob = new Blob([buildICS(30)], { type:'text/calendar;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'namaz-vremena.ics';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast('Файл создан — откройте его и нажмите «Добавить все»');
+    } catch(e){
+      toast('Не удалось создать файл');
+    }
+  });
+
+  $('#btn-notify').addEventListener('click', async () => {
+    if (state.settings.notify){
+      state.settings.notify = false;
+    } else {
+      state.settings.notify = true;
+      lastNotifyCheck = Date.now();
+      if (notifySupported() && Notification.permission === 'default'){
+        try{ await Notification.requestPermission(); } catch(e){}
+      }
+      toast('Напоминания включены (пока вкладка открыта)');
+    }
+    save(); syncSettingsUI();
+  });
+
+  // Резервные копии
+  $('#btn-export').addEventListener('click', exportJSON);
+  $('#btn-copy').addEventListener('click', copyJSON);
+  $('#btn-import-text').addEventListener('click', e => {
+    const text = $('#ta-data').value.trim();
+    if (!text){ toast('Вставьте JSON в поле выше'); return; }
+    armed(e.currentTarget, () => importFromText(text)); // импорт заменяет текущие данные
+  });
+  $('#btn-import-file').addEventListener('click', e =>
+    armed(e.currentTarget, () => $('#file-import').click()));
+  $('#file-import').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => importFromText(String(r.result));
+    r.readAsText(f);
+    e.target.value = '';
+  });
+
+  // Полная очистка записей (настройки сохраняются)
+  $('#btn-clear').addEventListener('click', e => armed(e.currentTarget, () => {
+    state.days = {};
+    state.manualQada = 0;
+    state.firstDay = null;
+    save(true); renderAll();
+    toast('Все отметки удалены');
+  }));
+}
+
+/* ---------- 12. Такт: полночь, отсчёт, напоминания ---------- */
+function tick(){
+  const t = todayStr();
+  if (t !== currentDay){           // смена дня в полночь по местному времени
+    currentDay = t;
+    timesCache = {};
+    calCursor = null;
+    renderAll();
+  }
+  // Обновляем строку «до следующего намаза» без полной перерисовки
+  if (activeTab === 'today'){
+    const ni = nextPrayerInfo();
+    const lbl = $('#next-label'), rel = $('#next-rel');
+    if (ni && lbl && rel){
+      lbl.textContent = ni.label;
+      rel.textContent = ni.rel;
+      if (ni.todayPid !== lastNextPid){
+        renderToday(); // время намаза настало — сняли блокировку, сместили подсветку
+        if (sheetDate === currentDay) renderSheet();
+      }
+    } else if (ni && !lbl){
+      renderToday();
+    }
+  }
+  checkNotifications();
+}
+
+/* ---------- 13. Запуск ---------- */
+async function init(){
+  store.init();
+  let raw = null;
+  try{
+    const s = await store.get(STORE_KEY);
+    if (s) raw = JSON.parse(s);
+  } catch(e){ /* повреждённые данные — начинаем с чистого листа */ }
+  state = hydrate(raw);
+  applyTheme();
+  buildCitySelect();
+  syncSettingsUI();
+  bindEvents();
+  renderAll();
+  setInterval(tick, 20000); // каждые 20 секунд: полночь / отсчёт / напоминания
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tick();
+    else save(true); // уходя в фон — сохранить немедленно
+  });
+  window.addEventListener('beforeunload', () => save(true));
+}
+init();
+</script>
+</body>
+</html>
